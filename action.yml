@@ -1,0 +1,89 @@
+name: Psalm Taint analysis
+description: |
+  Run psalm with --taint-analysis and upload sarif file artifact
+
+inputs:
+  report-retention-days:
+    description: "Duration in days to preserve reports."
+    required: false
+    default: "5"
+  memory-limit:
+    description: Memory limit for analysis
+    required: false
+  extra-args:
+    description: Extra arguments to pass to the psalm binary
+    required: false
+  default-branch:
+    description: "Default branch to compute changed files"
+    required: true
+    default: "main"
+  only-changed-files:
+    description: |
+      Run psalm analysis only on changed files compared to default branch(main). Or previous commit for main branch.
+      With this option, if fetch-depth is not set or greater than 0 you can add a step to fetch the origin/main branch
+      ```yaml
+      - name : Fetch origin/main
+        run : |
+          git fetch --no-tags --prune --depth=1000 origin +refs/heads/main:refs/remotes/origin/main
+      ```
+    required: false
+    default: false
+  working-directory:
+    description: "Workflow working directory"
+    default: '.'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: psalm
+      working-directory: ${{ inputs.working-directory }}
+      shell: bash
+      run: |
+        command_string=(./vendor/bin/psalm --long-progress)
+
+        if [ -n "${{ inputs.memory-limit }}" ]
+        then
+          command_string+=(--memory-limit="${{ inputs.memory-limit }}")
+        fi
+
+        if [ -n "${{ inputs.extra-args }}" ]
+        then
+          command_string+=(${{ inputs.extra-args }})
+        fi
+
+        if [[ "${{ inputs.only-changed-files }}" == "yes" ]] ; then
+          CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+          if [[ "$CURRENT_BRANCH" == "${{ inputs.default-branch }}" ]] ; then
+            echo "Running psalm on all files"
+          else
+            # Compute changed files
+            if [[ -n "${GITHUB_BASE_REF}" ]]; then
+              DIFF_TARGET="origin/$GITHUB_BASE_REF..."
+            else
+              DIFF_TARGET="origin/${{ inputs.default-branch }}..."
+            fi
+
+            # Allow to fail early if DIFF_TARGET not found on repo
+            git rev-parse $DIFF_TARGET > /dev/null 2>&1 || { echo "Diff target not found '$DIFF_TARGET'. You probably miss a git fetch step." > /dev/stderr; exit 1; }
+
+            # Get changed files which match the pattern.
+            # NOTE:
+            # `|| :` is used to avoid exit by grep, when no line matches the pattern.
+            CHANGED_FILES=$(git diff $DIFF_TARGET --diff-filter=AM --name-only --no-color | grep -e "\.php" || :)
+            NUM_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep -v -e '^\s*$' | wc -l || :)
+            if [[ $NUM_CHANGED_FILES -le 0 ]] ; then
+              echo "No file changes. Skip psalm."
+              exit 0
+            elif [[ $NUM_CHANGED_FILES -le 150 ]] ; then
+              echo "Running psalm on changed files"
+              echo "$CHANGED_FILES"
+              command_string+=(-- $CHANGED_FILES)
+            else
+              echo "Running psalm on all files"
+            fi
+          fi
+        fi
+
+      echo "Command: " "${command_string[@]}"
+      ${command_string[@]}
