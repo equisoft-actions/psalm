@@ -85,5 +85,5 @@ runs:
           fi
         fi
 
-      echo "Command: " "${command_string[@]}"
-      ${command_string[@]}
+        echo "Command: " "${command_string[@]}"
+        ${command_string[@]}
