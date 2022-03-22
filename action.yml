@@ -1,12 +1,8 @@
-name: Psalm Taint analysis
+name: Psalm
 description: |
-  Run psalm with --taint-analysis and upload sarif file artifact
+  Run psalm
 
 inputs:
-  report-retention-days:
-    description: "Duration in days to preserve reports."
-    required: false
-    default: "5"
   memory-limit:
     description: Memory limit for analysis
     required: false
@@ -28,6 +24,14 @@ inputs:
       ```
     required: false
     default: false
+  changed-files-pattern:
+    description: File path pattern.
+    default: \.php
+    required: true
+  changed-files-threshold:
+    description: If changed file count is greater than this number, perform a full phpcs.
+    default: '150'
+    required: true
   working-directory:
     description: "Workflow working directory"
     default: '.'
@@ -70,12 +74,12 @@ runs:
             # Get changed files which match the pattern.
             # NOTE:
             # `|| :` is used to avoid exit by grep, when no line matches the pattern.
-            CHANGED_FILES=$(git diff $DIFF_TARGET --diff-filter=AM --name-only --no-color | grep -e "\.php" || :)
+            CHANGED_FILES=$(git diff $DIFF_TARGET --diff-filter=AM --name-only --no-color | grep -e "${{ inputs.changed-files-pattern }}" || :)
             NUM_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep -v -e '^\s*$' | wc -l || :)
             if [[ $NUM_CHANGED_FILES -le 0 ]] ; then
               echo "No file changes. Skip psalm."
               exit 0
-            elif [[ $NUM_CHANGED_FILES -le 150 ]] ; then
+            elif [[ $NUM_CHANGED_FILES -le ${{ inputs.changed-files-threshold }} ]] ; then
               echo "Running psalm on changed files"
               echo "$CHANGED_FILES"
               command_string+=(-- $CHANGED_FILES)
