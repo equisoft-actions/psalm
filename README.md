@@ -1,2 +1,2 @@
-# phpunit
+# psalm
 psalm github action
