@@ -6,6 +6,11 @@ inputs:
   memory-limit:
     description: Memory limit for analysis
     required: false
+  php-version:
+    description: |
+      Set the php version Psalm should assume when checking and/or fixing the project.
+      ex: "8.1"
+    required: false
   extra-args:
     description: Extra arguments to pass to the psalm binary
     required: false
@@ -49,6 +54,11 @@ runs:
         if [ -n "${{ inputs.memory-limit }}" ]
         then
           command_string+=(--memory-limit="${{ inputs.memory-limit }}")
+        fi
+
+        if [ -n "${{ inputs.php-version }}" ]
+        then
+          command_string+=(--php-version="${{ inputs.php-version }}")
         fi
 
         if [ -n "${{ inputs.extra-args }}" ]
