@@ -67,13 +67,14 @@ runs:
         fi
 
         if [[ "${{ inputs.only-changed-files }}" == "true" ]] ; then
+          BASE_REF=${{ github.event.pull_request.base.ref }}
           CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
           if [[ "$CURRENT_BRANCH" == "${{ inputs.default-branch }}" ]] ; then
             echo "Running psalm on all files"
           else
             # Compute changed files
-            if [[ -n "${GITHUB_BASE_REF}" ]]; then
-              DIFF_TARGET="origin/$GITHUB_BASE_REF..."
+            if [[ -n "${BASE_REF}" ]]; then
+              DIFF_TARGET="origin/$BASE_REF..."
             else
               DIFF_TARGET="origin/${{ inputs.default-branch }}..."
             fi
